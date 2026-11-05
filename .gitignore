@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+build/
+dist/
+
+# Tooling caches
+.pytest_cache/
+.hypothesis/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Fuzzing output (atheris / libFuzzer)
+crash-*
+leak-*
+timeout-*
+corpus/
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
