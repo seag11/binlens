@@ -1,0 +1,22 @@
+[project]
+name = "binlens"
+version = "0.1.0"
+description = "Static analyser for Windows x86-64 executables, built on a hand-written decoder"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.scripts]
+binlens = "binlens.cli:main"
+
+[dependency-groups]
+dev = [
+    "pytest>=8",
+    "hypothesis>=6",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
