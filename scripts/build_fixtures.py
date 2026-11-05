@@ -24,9 +24,14 @@ FLAGS = [
     "-fno-sanitize=undefined",  # zig enables UBSan traps at -O0 by default
     "-fno-stack-protector",
     "-g0",  # no debug sections
+    "-s",  # strip: no .pdb, which would record local paths and the full link command
     # Without the C runtime the linker's default entry is wWinMainCRTStartup (a GUI program).
     "-Wl,--entry=mainCRTStartup",
     "-Wl,--subsystem,console",
+    # Reproducible output: /Brepro writes a hash of the contents where the build time would
+    # go. The .buildid section remains, holding only that hash.
+    "-Wl,/Brepro",
+    "-Wl,--build-id=none",
 ]
 
 

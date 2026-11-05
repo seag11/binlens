@@ -25,3 +25,8 @@ corpus/
 .vscode/
 .idea/
 .DS_Store
+
+# Debug and link by-products from building test programs
+*.pdb
+*.lib
+*.obj
