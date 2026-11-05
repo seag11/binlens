@@ -36,20 +36,11 @@ class OpSpec:
 
 # Opcodes where ModRM.reg is part of the opcode ("83 /0" is add, "83 /7" is cmp).
 GROUPS: dict[int, dict[int, OpSpec]] = {
-    0x80: {0: OpSpec("add", ("Eb", "Ib"), lockable=True)},
-    0x81: {0: OpSpec("add", ("Ev", "Iz"), lockable=True)},
-    0x83: {0: OpSpec("add", ("Ev", "sIb"), lockable=True)},
     0xC6: {0: OpSpec("mov", ("Eb", "Ib"))},
     0xC7: {0: OpSpec("mov", ("Ev", "Iz"))},
 }
 
 ONE_BYTE: dict[int, OpSpec] = {
-    0x00: OpSpec("add", ("Eb", "Gb"), lockable=True),
-    0x01: OpSpec("add", ("Ev", "Gv"), lockable=True),
-    0x02: OpSpec("add", ("Gb", "Eb")),
-    0x03: OpSpec("add", ("Gv", "Ev")),
-    0x04: OpSpec("add", ("AL", "Ib")),
-    0x05: OpSpec("add", ("rAX", "Iz")),
     0x88: OpSpec("mov", ("Eb", "Gb")),
     0x89: OpSpec("mov", ("Ev", "Gv")),
     0x8A: OpSpec("mov", ("Gb", "Eb")),
@@ -58,6 +49,26 @@ ONE_BYTE: dict[int, OpSpec] = {
     0xC2: OpSpec("ret", ("Iw",), allow_rep=True, allow_opsize_override=False),
     0xC3: OpSpec("ret", (), allow_rep=True, allow_opsize_override=False),
 }
+
+# The eight arithmetic/logic operations share one layout. Operation n owns opcodes
+# n*8 + 0..5, and is /n in the immediate groups 80, 81 and 83. (n*8 + 6 and 7 are segment
+# prefixes or invalid in 64-bit mode; 82 is an invalid alias of 80.) cmp only reads its
+# destination, so it can't take LOCK.
+ALU_OPERATIONS = ("add", "or", "adc", "sbb", "and", "sub", "xor", "cmp")
+
+GROUPS[0x80], GROUPS[0x81], GROUPS[0x83] = {}, {}, {}
+for _n, _mnemonic in enumerate(ALU_OPERATIONS):
+    _lockable = _mnemonic != "cmp"
+    ONE_BYTE[_n * 8 + 0] = OpSpec(_mnemonic, ("Eb", "Gb"), lockable=_lockable)
+    ONE_BYTE[_n * 8 + 1] = OpSpec(_mnemonic, ("Ev", "Gv"), lockable=_lockable)
+    ONE_BYTE[_n * 8 + 2] = OpSpec(_mnemonic, ("Gb", "Eb"))
+    ONE_BYTE[_n * 8 + 3] = OpSpec(_mnemonic, ("Gv", "Ev"))
+    ONE_BYTE[_n * 8 + 4] = OpSpec(_mnemonic, ("AL", "Ib"))
+    ONE_BYTE[_n * 8 + 5] = OpSpec(_mnemonic, ("rAX", "Iz"))
+    GROUPS[0x80][_n] = OpSpec(_mnemonic, ("Eb", "Ib"), lockable=_lockable)
+    GROUPS[0x81][_n] = OpSpec(_mnemonic, ("Ev", "Iz"), lockable=_lockable)
+    GROUPS[0x83][_n] = OpSpec(_mnemonic, ("Ev", "sIb"), lockable=_lockable)
+del _n, _mnemonic, _lockable
 
 for _reg in range(8):
     ONE_BYTE[0xB0 + _reg] = OpSpec("mov", ("Zb", "Ib"))

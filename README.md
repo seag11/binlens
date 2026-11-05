@@ -2,7 +2,7 @@
 
 A static analyzer for Windows x86-64 executables, built on a from-scratch disassembler.
 
-**Status: early.** The x86-64 decoder handles `mov`, `add` and `ret` so far. PE loading and capability detection come next; see [PLAN.md](PLAN.md) for the roadmap.
+**Status: early.** The x86-64 decoder handles `mov`, `ret` and the arithmetic/logic group (`add`, `or`, `adc`, `sbb`, `and`, `sub`, `xor`, `cmp`) so far. PE loading and capability detection come next; see [PLAN.md](PLAN.md) for the roadmap.
 
 ## Usage
 

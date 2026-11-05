@@ -90,6 +90,43 @@ CASES = [
     ("48 83 c0 ff", "add rax, 0xffffffffffffffff"),
     ("f0 01 08", "lock add dword ptr [rax], ecx"),
     ("f0 48 83 00 01", "lock add qword ptr [rax], 0x1"),
+    # --- the rest of the arithmetic/logic family: same layout as add ---
+    ("09 c8", "or eax, ecx"),
+    ("11 c8", "adc eax, ecx"),
+    ("19 c8", "sbb eax, ecx"),
+    ("21 c8", "and eax, ecx"),
+    ("29 c8", "sub eax, ecx"),
+    ("31 c0", "xor eax, eax"),
+    ("33 c9", "xor ecx, ecx"),  # from the example listing in PLAN.md
+    ("39 c8", "cmp eax, ecx"),
+    ("0a 03", "or al, byte ptr [rbx]"),
+    ("22 c1", "and al, cl"),
+    ("2b 4d fc", "sub ecx, dword ptr [rbp-0x4]"),
+    ("48 3b 45 f0", "cmp rax, qword ptr [rbp-0x10]"),
+    ("0c 01", "or al, 0x1"),
+    ("14 01", "adc al, 0x1"),
+    ("1c 01", "sbb al, 0x1"),
+    ("24 0f", "and al, 0xf"),
+    ("2c 01", "sub al, 0x1"),
+    ("34 01", "xor al, 0x1"),
+    ("3c 05", "cmp al, 0x5"),
+    ("0d 00 00 01 00", "or eax, 0x10000"),
+    ("2d 10 00 00 00", "sub eax, 0x10"),
+    ("66 25 ff 00", "and ax, 0xff"),
+    ("48 3d ff ff ff ff", "cmp rax, 0xffffffffffffffff"),
+    ("80 e1 0f", "and cl, 0xf"),
+    ("80 f9 05", "cmp cl, 0x5"),
+    ("81 e1 ff 00 00 00", "and ecx, 0xff"),
+    ("83 c8 01", "or eax, 0x1"),
+    ("48 83 d0 00", "adc rax, 0x0"),
+    ("83 d8 01", "sbb eax, 0x1"),
+    ("48 83 e4 f0", "and rsp, 0xfffffffffffffff0"),
+    ("48 83 ec 30", "sub rsp, 0x30"),  # from basic.exe
+    ("83 f0 01", "xor eax, 0x1"),
+    ("83 7d f8 0a", "cmp dword ptr [rbp-0x8], 0xa"),  # from basic.exe
+    ("f0 29 08", "lock sub dword ptr [rax], ecx"),
+    ("f0 83 28 01", "lock sub dword ptr [rax], 0x1"),
+    ("f0 48 31 08", "lock xor qword ptr [rax], rcx"),
     # --- ret ---
     ("c3", "ret"),
     ("c2 08 00", "ret 0x8"),
@@ -199,6 +236,9 @@ def test_truncated(hex_bytes: str) -> None:
         "f0 01 c8",  # LOCK with a register destination
         "f0 89 08",  # mov is not lockable
         "f0 c3",
+        "f0 03 08",  # the register-destination form of add
+        "f0 39 08",  # cmp only reads memory
+        "f0 83 38 01",
     ],
 )
 def test_invalid(hex_bytes: str) -> None:
@@ -211,7 +251,8 @@ def test_invalid(hex_bytes: str) -> None:
     [
         "90",  # nop: not in the table yet
         "0f 0b",  # ud2: two-byte opcodes not yet supported
-        "83 c8 01",  # or (83 /1): only /0 is in the table so far
+        "d1 e0",  # shl: not in the table yet
+        "82 c0 01",  # an alias of 80 that 64-bit mode removed
         "c7 c8 00 00 00 00",  # C7 /1 is not mov
         "66 c3",  # 16-bit ret: Intel and AMD disagree
         "f2 c3",  # bnd ret
