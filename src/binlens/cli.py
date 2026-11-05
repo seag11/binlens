@@ -6,6 +6,7 @@ import argparse
 from collections.abc import Iterator, Sequence
 from pathlib import Path
 
+from binlens.pe import PEFormatError, parse_pe
 from binlens.x86 import DecodeError, decode
 from binlens.x86.intel import format_bad_line, format_listing_line
 
@@ -48,7 +49,26 @@ def main(argv: Sequence[str] | None = None) -> int:
             "--address", type=_int, default=0, help="virtual address of the first byte (default 0)"
         )
 
+    exe_cmd = commands.add_parser("exe", help="disassemble the executable sections of a PE file")
+    exe_cmd.add_argument("path", type=Path)
+
     args = parser.parse_args(argv)
+    if args.command == "exe":
+        try:
+            image = parse_pe(args.path.read_bytes())
+        except PEFormatError as err:
+            parser.exit(1, f"binlens: {args.path}: {err}\n")
+        print(f"; entry point {image.entry_point:#x}")
+        for section in image.sections:
+            if not section.executable:
+                continue
+            start = image.image_base + section.virtual_address
+            code = image.section_bytes(section)
+            print(f"\n; section {section.name}  {start:#x}  {len(code):#x} bytes")
+            for line in listing(code, start):
+                print(line)
+        return 0
+
     if args.command == "hex":
         try:
             data = bytes.fromhex(" ".join(args.hex))

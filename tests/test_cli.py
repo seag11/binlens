@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import pytest
+from pebuild import make_pe
 
 from binlens.cli import main
 
@@ -41,6 +42,28 @@ def test_raw_file(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
         "0x00001000  48 89 c3           mov   rbx, rax",
         "0x00001003  c3                 ret",
     ]
+
+
+def test_exe(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    exe = tmp_path / "tiny.exe"
+    exe.write_bytes(make_pe(bytes.fromhex("48 83 c4 28 c3")))
+    lines = run(capsys, "exe", str(exe))
+    assert lines == [
+        "; entry point 0x140001000",
+        "",
+        "; section .text  0x140001000  0x5 bytes",
+        "0x140001000  48 83 c4 28        add   rsp, 0x28",
+        "0x140001004  c3                 ret",
+    ]
+
+
+def test_exe_rejects_non_pe(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    path = tmp_path / "not.exe"
+    path.write_bytes(b"hello")
+    with pytest.raises(SystemExit) as exc:
+        main(["exe", str(path)])
+    assert exc.value.code == 1
+    assert "no MZ signature" in capsys.readouterr().err
 
 
 def test_invalid_hex_is_a_usage_error(capsys: pytest.CaptureFixture[str]) -> None:

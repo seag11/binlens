@@ -18,7 +18,7 @@ uv run binlens hex "48 83 c4 28 c3" --address 0x140001000
 0x140001004  c3                 ret
 ```
 
-`binlens raw FILE [--offset N] [--address A]` disassembles a file as raw code bytes. Bytes that don't decode are listed as `(bad)` with the reason.
+`binlens exe FILE` disassembles the executable sections of a 64-bit Windows `.exe`, and `binlens raw FILE [--offset N] [--address A]` treats any file as raw code bytes. Bytes that don't decode are listed as `(bad)` with the reason.
 
 ## Scope
 
@@ -31,3 +31,9 @@ uv run pytest
 ```
 
 The tests combine hand-checked encodings with Hypothesis property tests: any input must either decode or be rejected, without reading past the input or past the 15-byte instruction limit.
+
+Test programs are small C files in `tests/fixtures/src/`, compiled for Windows x86-64 with the zig version pinned in `uv.lock`, with no C runtime linked in:
+
+```
+uv run python scripts/build_fixtures.py
+```

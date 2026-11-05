@@ -12,6 +12,7 @@ binlens = "binlens.cli:main"
 dev = [
     "pytest>=8",
     "hypothesis>=6",
+    "ziglang>=0.17.1",
 ]
 
 [build-system]
