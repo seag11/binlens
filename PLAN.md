@@ -1,6 +1,6 @@
 # binlens: project plan
 
-A static analyser for Windows executables, written from scratch. Point it at an `.exe`: it parses the file, disassembles the code to x86-64 assembly, and flags suspicious capabilities. It never runs the binary.
+A static analyzer for Windows executables, written from scratch. Point it at an `.exe`: it parses the file, disassembles the code to x86-64 assembly, and flags suspicious capabilities. It never runs the binary.
 
 ```
 program.exe ──► PE loader ──► code bytes + addresses ──► decoder ──► assembly listing
@@ -108,7 +108,7 @@ This is what makes the project credible.
 
 - **No live malware, ever.** Test only on programs you wrote and compiled yourself.
 - **No decompiler.** It's research-grade and not needed for any of the goals above.
-- **Check licences** of any reference tool or dataset before depending on it.
+- **Check licenses** of any reference tool or dataset before depending on it.
 - **Test binaries** must be cross-compiled for Windows x86-64 (e.g. `zig cc -target x86_64-windows-gnu`, or MinGW). Native macOS binaries are Mach-O, and ARM on Apple Silicon.
 
 ## Open decisions

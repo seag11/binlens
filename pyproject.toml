@@ -1,7 +1,7 @@
 [project]
 name = "binlens"
 version = "0.1.0"
-description = "Static analyser for Windows x86-64 executables, built on a hand-written decoder"
+description = "Static analyzer for Windows x86-64 executables, built on a hand-written decoder"
 requires-python = ">=3.11"
 dependencies = []
 
