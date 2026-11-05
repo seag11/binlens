@@ -2,7 +2,7 @@
 
 A static analyzer for Windows x86-64 executables, built on a from-scratch disassembler.
 
-**Status: early.** The x86-64 decoder handles `mov`, `ret` and the arithmetic/logic group (`add`, `or`, `adc`, `sbb`, `and`, `sub`, `xor`, `cmp`) so far. PE loading and capability detection come next; see [PLAN.md](PLAN.md) for the roadmap.
+**Status: early.** The x86-64 decoder handles `mov`, `ret` and the arithmetic/logic group (`add`, `or`, `adc`, `sbb`, `and`, `sub`, `xor`, `cmp`) so far. A minimal PE reader (headers and section table) supplies it with the code from an `.exe`. Import parsing, following jumps and calls instead of decoding front to back, and capability detection come next; see [PLAN.md](PLAN.md) for the roadmap.
 
 ## Usage
 
@@ -37,3 +37,7 @@ Test programs are small C files in `tests/fixtures/src/`, compiled for Windows x
 ```
 uv run python scripts/build_fixtures.py
 ```
+
+## License
+
+MIT. See [LICENSE](LICENSE).
