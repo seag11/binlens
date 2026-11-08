@@ -7,23 +7,17 @@ from collections.abc import Iterator, Sequence
 from pathlib import Path
 
 from binlens.pe import PEFormatError, parse_pe
-from binlens.x86 import DecodeError, decode
+from binlens.sweep import BadByte, linear_sweep
 from binlens.x86.intel import format_bad_line, format_listing_line
 
 
-def listing(data: bytes, address: int = 0) -> Iterator[str]:
-    """Linear sweep: decode ``data`` front to back. A byte that fails to decode is shown as
-    ``(bad)`` and the sweep resumes at the next byte."""
-    offset = 0
-    while offset < len(data):
-        try:
-            insn = decode(data, offset, address + offset)
-        except DecodeError as err:
-            yield format_bad_line(address + offset, data[offset], err.reason)
-            offset += 1
-            continue
-        yield format_listing_line(insn)
-        offset += insn.length
+def listing(code: bytes, address: int = 0) -> Iterator[str]:
+    """Listing lines for ``code``, decoded front to back."""
+    for item in linear_sweep(code, address):
+        if isinstance(item, BadByte):
+            yield format_bad_line(item.address, item.byte, item.error.reason)
+        else:
+            yield format_listing_line(item)
 
 
 def _int(text: str) -> int:
