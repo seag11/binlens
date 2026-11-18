@@ -127,6 +127,37 @@ CASES = [
     ("f0 29 08", "lock sub dword ptr [rax], ecx"),
     ("f0 83 28 01", "lock sub dword ptr [rax], 0x1"),
     ("f0 48 31 08", "lock xor qword ptr [rax], rcx"),
+    # --- push / pop: 64-bit by default, 66 makes them 16-bit ---
+    ("55", "push rbp"),  # from basic.exe
+    ("50", "push rax"),  # from basic.exe
+    ("5d", "pop rbp"),  # from basic.exe
+    ("41 57", "push r15"),
+    ("41 5c", "pop r12"),
+    ("48 50", "push rax"),  # REX.W changes nothing here
+    ("66 50", "push ax"),
+    ("66 41 58", "pop r8w"),
+    ("6a 10", "push 0x10"),
+    ("6a ff", "push 0xffffffffffffffff"),  # imm8 sign-extends to 64 bits
+    ("66 6a ff", "push 0xffff"),
+    ("68 78 56 34 12", "push 0x12345678"),
+    ("68 00 00 00 80", "push 0xffffffff80000000"),  # imm32 sign-extends too
+    ("66 68 34 12", "push 0x1234"),
+    ("ff 30", "push qword ptr [rax]"),
+    ("ff 75 f8", "push qword ptr [rbp-0x8]"),
+    ("41 ff 34 24", "push qword ptr [r12]"),
+    ("66 ff 30", "push word ptr [rax]"),
+    ("ff f0", "push rax"),  # the ModRM form of push rax
+    ("8f 00", "pop qword ptr [rax]"),
+    ("8f c0", "pop rax"),
+    # --- lea: an address, so no size and no memory access ---
+    ("48 8d 6c 24 30", "lea rbp, [rsp+0x30]"),  # from basic.exe
+    ("48 8d 05 10 00 00 00", "lea rax, [rip+0x10]"),
+    ("8d 04 89", "lea eax, [rcx+rcx*4]"),  # the multiply-by-5 idiom
+    ("48 8d 04 cd 00 00 00 00", "lea rax, [rcx*8]"),
+    ("4c 8d 4c 24 20", "lea r9, [rsp+0x20]"),
+    ("66 8d 00", "lea ax, [rax]"),
+    ("67 48 8d 00", "lea rax, [eax]"),
+    ("65 48 8d 00", "lea rax, gs:[rax]"),  # shown, though it doesn't change the result
     # --- ret ---
     ("c3", "ret"),
     ("c2 08 00", "ret 0x8"),
@@ -168,6 +199,13 @@ def test_gs_operand_records_segment() -> None:
     assert insn.operands == (
         RegisterOperand(GPR64[0]),
         MemoryOperand(size=64, base=None, index=None, scale=1, disp=0x60, segment="gs"),
+    )
+
+
+def test_lea_operand_has_no_access_size() -> None:
+    insn = decode(bytes.fromhex("48 8d 6c 24 30"))
+    assert insn.operands[1] == MemoryOperand(
+        size=None, base=GPR64[4], index=None, scale=1, disp=0x30
     )
 
 
@@ -220,6 +258,10 @@ def test_offset_outside_buffer() -> None:
         "b8 01 02",  # incomplete imm32
         "48 b8 01 02 03 04 05 06 07",  # incomplete imm64
         "c2 08",  # incomplete imm16
+        "6a",  # push imm8 without the immediate
+        "68 01 02 03",
+        "ff",  # missing ModRM
+        "8d 44 24",  # lea with its disp8 missing
         "c7 05 10 00 00 00 01",  # disp32 present, imm32 incomplete
     ],
 )
@@ -239,6 +281,10 @@ def test_truncated(hex_bytes: str) -> None:
         "f0 03 08",  # the register-destination form of add
         "f0 39 08",  # cmp only reads memory
         "f0 83 38 01",
+        "8d c0",  # lea needs a memory operand
+        "48 8d c8",
+        "f0 50",  # push is not lockable
+        "f0 ff 30",
     ],
 )
 def test_invalid(hex_bytes: str) -> None:
@@ -252,6 +298,8 @@ def test_invalid(hex_bytes: str) -> None:
         "90",  # nop: not in the table yet
         "0f 0b",  # ud2: two-byte opcodes not yet supported
         "d1 e0",  # shl: not in the table yet
+        "ff c0",  # inc (ff /0): only /6 (push) of that group so far
+        "8f c8",  # 8f with reg != 0 starts an AMD XOP instruction: out of scope
         "82 c0 01",  # an alias of 80 that 64-bit mode removed
         "c7 c8 00 00 00 00",  # C7 /1 is not mov
         "66 c3",  # 16-bit ret: Intel and AMD disagree

@@ -39,10 +39,11 @@ class MemoryOperand:
     """``segment:[base + index*scale + disp]``, accessing ``size`` bits.
 
     ``base`` is ``RIP``/``EIP`` for RIP-relative operands. With neither base nor index, ``disp``
-    is an absolute address (sign-extended from 32 bits, as the CPU does).
+    is an absolute address (sign-extended from 32 bits, as the CPU does). ``size`` is None
+    when the address is computed but memory is not accessed, as with lea.
     """
 
-    size: int
+    size: int | None
     base: Register | None
     index: Register | None
     scale: int  # 1, 2, 4 or 8; 1 when there is no index

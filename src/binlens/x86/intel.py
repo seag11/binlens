@@ -44,8 +44,10 @@ def _format_memory(op: MemoryOperand) -> str:
         elif op.disp < 0:
             inner += f"-{-op.disp:#x}"
 
-    segment = f"{op.segment}:" if op.segment else ""
-    return f"{_PTR[op.size]} ptr {segment}[{inner}]"
+    address = f"{op.segment}:[{inner}]" if op.segment else f"[{inner}]"
+    if op.size is None:  # lea: an address, not a memory access
+        return address
+    return f"{_PTR[op.size]} ptr {address}"
 
 
 def format_instruction(insn: Instruction) -> str:

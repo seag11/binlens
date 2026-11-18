@@ -4,6 +4,7 @@ Operand kinds use the notation of the Intel SDM opcode map (Vol. 2, Appendix A.2
 
     Eb, Ev   ModRM.rm: a register or memory operand, byte / operand-size
     Gb, Gv   ModRM.reg: a register, byte / operand-size
+    M        ModRM.rm, memory only: an address that is computed but not accessed (lea)
     Zb, Zv   a register in the low 3 bits of the opcode (extended by REX.B)
     AL, rAX  the accumulator, fixed by the opcode
     Ib, Iw   an 8-bit / 16-bit immediate
@@ -28,23 +29,30 @@ class OpSpec:
     # 66 on near branches behaves differently on Intel and AMD, so reject it rather than guess.
     allow_opsize_override: bool = True
     mnemonic64: str | None = None  # replaces the mnemonic at 64-bit operand size
+    # Operand size is 64 bits without REX.W (stack operations); 66 still makes it 16.
+    default64: bool = False
 
     @property
     def has_modrm(self) -> bool:
-        return any(kind[0] in "EG" for kind in self.operands)
+        return any(kind[0] in "EGM" for kind in self.operands)
 
 
 # Opcodes where ModRM.reg is part of the opcode ("83 /0" is add, "83 /7" is cmp).
 GROUPS: dict[int, dict[int, OpSpec]] = {
+    0x8F: {0: OpSpec("pop", ("Ev",), default64=True)},
     0xC6: {0: OpSpec("mov", ("Eb", "Ib"))},
     0xC7: {0: OpSpec("mov", ("Ev", "Iz"))},
+    0xFF: {6: OpSpec("push", ("Ev",), default64=True)},
 }
 
 ONE_BYTE: dict[int, OpSpec] = {
+    0x68: OpSpec("push", ("Iz",), default64=True),
+    0x6A: OpSpec("push", ("sIb",), default64=True),
     0x88: OpSpec("mov", ("Eb", "Gb")),
     0x89: OpSpec("mov", ("Ev", "Gv")),
     0x8A: OpSpec("mov", ("Gb", "Eb")),
     0x8B: OpSpec("mov", ("Gv", "Ev")),
+    0x8D: OpSpec("lea", ("Gv", "M")),
     # "rep ret" (F3 C3) is a common padding idiom in compiler output.
     0xC2: OpSpec("ret", ("Iw",), allow_rep=True, allow_opsize_override=False),
     0xC3: OpSpec("ret", (), allow_rep=True, allow_opsize_override=False),
@@ -71,6 +79,8 @@ for _n, _mnemonic in enumerate(ALU_OPERATIONS):
 del _n, _mnemonic, _lockable
 
 for _reg in range(8):
+    ONE_BYTE[0x50 + _reg] = OpSpec("push", ("Zv",), default64=True)
+    ONE_BYTE[0x58 + _reg] = OpSpec("pop", ("Zv",), default64=True)
     ONE_BYTE[0xB0 + _reg] = OpSpec("mov", ("Zb", "Ib"))
     # With REX.W this takes a full 64-bit immediate; Capstone and objdump call that form movabs.
     ONE_BYTE[0xB8 + _reg] = OpSpec("mov", ("Zv", "Iv"), mnemonic64="movabs")

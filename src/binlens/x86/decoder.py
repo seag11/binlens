@@ -134,7 +134,7 @@ def decode(data: Bytes, offset: int = 0, address: int = 0) -> Instruction:
     elif opsize_override:
         opsize = 16
     else:
-        opsize = 32
+        opsize = 64 if spec.default64 else 32
     addrsize = 32 if addrsize_override else 64
 
     # ModRM.rm (with SIB and displacement) comes before any immediate in the byte stream,
@@ -145,6 +145,13 @@ def decode(data: Bytes, offset: int = 0, address: int = 0) -> Instruction:
             assert modrm is not None
             size = 8 if kind == "Eb" else opsize
             rm_operand = _decode_rm(reader, modrm, rex_bits, has_rex, size, addrsize, segment)
+        elif kind == "M":
+            assert modrm is not None
+            if modrm >> 6 == 3:
+                raise InvalidInstruction(f"{spec.mnemonic} with a register operand", offset)
+            # Only the address is used, so there is no access size. A segment override has no
+            # effect on the result, but it is in the bytes, so keep it visible.
+            rm_operand = _decode_rm(reader, modrm, rex_bits, has_rex, None, addrsize, segment)
 
     operands = tuple(
         _operand(kind, reader, spec, opcode, modrm, rm_operand, rex_bits, has_rex, opsize)
@@ -180,7 +187,7 @@ def _operand(
     opsize: int,
 ) -> Operand:
     match kind:
-        case "Eb" | "Ev":
+        case "Eb" | "Ev" | "M":
             assert rm_operand is not None
             return rm_operand
         case "Gb" | "Gv":
@@ -216,14 +223,18 @@ def _decode_rm(
     modrm: int,
     rex: int,
     has_rex: bool,
-    size: int,
+    size: int | None,
     addrsize: int,
     segment: str | None,
 ) -> Operand:
-    """The operand named by ModRM.mod/rm, reading any SIB byte and displacement."""
+    """The operand named by ModRM.mod/rm, reading any SIB byte and displacement.
+
+    ``size`` is None for an address that is never accessed (lea); then mod must not be 3.
+    """
     mod, rm = modrm >> 6, modrm & 7
     b_ext = 8 if rex & _REX_B else 0
     if mod == 3:
+        assert size is not None
         return RegisterOperand(gpr(rm | b_ext, size, rex=has_rex))
 
     # The special cases below test the raw 3-bit fields, before REX.B is applied. That is why
