@@ -7,6 +7,7 @@ from binlens.x86 import (
     InvalidInstruction,
     MemoryOperand,
     RegisterOperand,
+    RelativeOperand,
     TruncatedInstruction,
     UnsupportedInstruction,
     decode,
@@ -158,6 +159,21 @@ CASES = [
     ("66 8d 00", "lea ax, [rax]"),
     ("67 48 8d 00", "lea rax, [eax]"),
     ("65 48 8d 00", "lea rax, gs:[rax]"),  # shown, though it doesn't change the result
+    # --- direct branches: targets count from the end of the instruction (address 0 here) ---
+    ("e8 00 00 00 00", "call 0x5"),
+    ("e8 fb ff ff ff", "call 0x0"),  # a negative displacement
+    ("e9 00 01 00 00", "jmp 0x105"),
+    ("eb fe", "jmp 0x0"),  # jumps to itself
+    ("eb 00", "jmp 0x2"),
+    ("0f 84 10 00 00 00", "je 0x16"),
+    ("40 eb 00", "jmp 0x3"),  # a REX prefix lengthens the instruction, so the target moves
+    # --- indirect branches ---
+    ("ff d0", "call rax"),
+    ("41 ff d3", "call r11"),
+    ("48 ff e0", "jmp rax"),  # REX.W changes nothing here
+    ("ff 15 10 00 00 00", "call qword ptr [rip+0x10]"),  # how compiled code calls imports
+    ("ff 25 10 00 00 00", "jmp qword ptr [rip+0x10]"),
+    ("ff 24 c5 00 10 00 00", "jmp qword ptr [rax*8+0x1000]"),  # a jump table
     # --- ret ---
     ("c3", "ret"),
     ("c2 08 00", "ret 0x8"),
@@ -166,6 +182,11 @@ CASES = [
     # --- the 15-byte limit, exactly ---
     ("66 " * 13 + "89 c3", "mov bx, ax"),
 ]
+
+# All 16 conditional jumps, short (70+cc rel8) and near (0f 80+cc rel32), displacement 0.
+_CONDITIONS = "o no b ae e ne be a s ns p np l ge le g".split()
+CASES += [(f"{0x70 + cc:02x} 00", f"j{name} 0x2") for cc, name in enumerate(_CONDITIONS)]
+CASES += [(f"0f {0x80 + cc:02x} 00 00 00 00", f"j{name} 0x6") for cc, name in enumerate(_CONDITIONS)]
 
 
 @pytest.mark.parametrize(("hex_bytes", "text"), CASES, ids=[text for _, text in CASES])
@@ -207,6 +228,29 @@ def test_lea_operand_has_no_access_size() -> None:
     assert insn.operands[1] == MemoryOperand(
         size=None, base=GPR64[4], index=None, scale=1, disp=0x30
     )
+
+
+def test_call_target_in_basic_exe() -> None:
+    # The call in basic.exe's loop goes to the add() helper at 0x140001040.
+    insn = decode(bytes.fromhex("e8 17 00 00 00"), address=0x140001024)
+    assert insn.operands == (RelativeOperand(0x17, 32),)
+    assert insn.branch_target == 0x140001040
+
+
+def test_backward_jump_target() -> None:
+    # basic.exe's loop jumps back to its compare.
+    insn = decode(bytes.fromhex("eb e1"), address=0x140001035)
+    assert insn.branch_target == 0x140001018
+
+
+def test_branch_target_wraps_at_64_bits() -> None:
+    insn = decode(bytes.fromhex("e8 f6 ff ff ff"))
+    assert insn.branch_target == 0xFFFF_FFFF_FFFF_FFFB
+
+
+def test_no_branch_target_for_indirect_or_non_branches() -> None:
+    assert decode(bytes.fromhex("ff d0")).branch_target is None
+    assert decode(bytes.fromhex("c3")).branch_target is None
 
 
 def test_immediate_signed_view() -> None:
@@ -262,6 +306,10 @@ def test_offset_outside_buffer() -> None:
         "68 01 02 03",
         "ff",  # missing ModRM
         "8d 44 24",  # lea with its disp8 missing
+        "0f",  # escape byte, then nothing
+        "e8 00 00 00",
+        "eb",
+        "0f 84 00 00",
         "c7 05 10 00 00 00 01",  # disp32 present, imm32 incomplete
     ],
 )
@@ -285,6 +333,7 @@ def test_truncated(hex_bytes: str) -> None:
         "48 8d c8",
         "f0 50",  # push is not lockable
         "f0 ff 30",
+        "f0 e8 00 00 00 00",
     ],
 )
 def test_invalid(hex_bytes: str) -> None:
@@ -296,7 +345,13 @@ def test_invalid(hex_bytes: str) -> None:
     "hex_bytes",
     [
         "90",  # nop: not in the table yet
-        "0f 0b",  # ud2: two-byte opcodes not yet supported
+        "0f 0b",  # ud2: not in the two-byte table yet
+        "0f 38 00 c0",  # three-byte opcode map (SSSE3 pshufb): out of scope
+        "66 e8 00 00",  # 16-bit call: Intel and AMD disagree
+        "66 ff d0",
+        "f2 e8 00 00 00 00",  # bnd call (MPX)
+        "ff 18",  # far call (ff /3)
+        "e3 00",  # jrcxz: not in the table yet
         "d1 e0",  # shl: not in the table yet
         "ff c0",  # inc (ff /0): only /6 (push) of that group so far
         "8f c8",  # 8f with reg != 0 starts an AMD XOP instruction: out of scope

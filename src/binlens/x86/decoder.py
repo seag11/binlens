@@ -19,8 +19,9 @@ from binlens.x86.instruction import (
     MemoryOperand,
     Operand,
     RegisterOperand,
+    RelativeOperand,
 )
-from binlens.x86.opcodes import GROUPS, ONE_BYTE, OpSpec
+from binlens.x86.opcodes import GROUPS, ONE_BYTE, TWO_BYTE, OpSpec
 from binlens.x86.registers import EIP, GPR8, RIP, Register, gpr
 
 MAX_LENGTH = 15
@@ -103,12 +104,19 @@ def decode(data: Bytes, offset: int = 0, address: int = 0) -> Instruction:
         rex = None
     opcode = byte
 
-    if opcode == 0x0F:
-        raise UnsupportedInstruction("two-byte opcode 0f xx", offset)
-
     modrm: int | None = None
     group = GROUPS.get(opcode)
-    if group is not None:
+    if opcode == 0x0F:
+        # Two-byte opcode. From here on `opcode` is the second byte, which is the one that
+        # can carry a register number.
+        opcode = reader.u8()
+        found = TWO_BYTE.get(opcode)
+        if found is None:
+            raise UnsupportedInstruction(f"opcode 0f {opcode:02x}", offset)
+        spec = found
+        if spec.has_modrm:
+            modrm = reader.u8()
+    elif group is not None:
         modrm = reader.u8()
         reg_field = (modrm >> 3) & 7
         spec = group.get(reg_field)
@@ -211,6 +219,10 @@ def _operand(
             return _immediate(reader.signed(2 if opsize == 16 else 4), opsize)
         case "Iv":
             return _immediate(reader.signed(opsize // 8), opsize)
+        case "Jb":
+            return RelativeOperand(reader.signed(1), 8)
+        case "Jz":  # 32 bits: a 16-bit form would need a 66 prefix, which branches reject
+            return RelativeOperand(reader.signed(4), 32)
     raise AssertionError(f"{spec.mnemonic}: unknown operand kind {kind!r}")
 
 

@@ -8,6 +8,7 @@ from binlens.x86.instruction import (
     MemoryOperand,
     Operand,
     RegisterOperand,
+    RelativeOperand,
 )
 
 _PTR = {8: "byte", 16: "word", 32: "dword", 64: "qword"}
@@ -17,7 +18,8 @@ _BYTES_WIDTH = 17  # six bytes of hex
 _MNEMONIC_WIDTH = 5
 
 
-def format_operand(operand: Operand) -> str:
+def format_operand(operand: Operand, insn: Instruction) -> str:
+    """One operand of ``insn``, which is needed to resolve branch targets."""
     match operand:
         case RegisterOperand(reg=reg):
             return reg.name
@@ -25,7 +27,13 @@ def format_operand(operand: Operand) -> str:
             return f"{value:#x}"
         case MemoryOperand():
             return _format_memory(operand)
+        case RelativeOperand():  # shown as the absolute target, like Capstone and objdump
+            return f"{insn.branch_target:#x}"
     raise TypeError(f"not an operand: {operand!r}")
+
+
+def _operands(insn: Instruction) -> str:
+    return ", ".join(format_operand(op, insn) for op in insn.operands)
 
 
 def _format_memory(op: MemoryOperand) -> str:
@@ -55,7 +63,7 @@ def format_instruction(insn: Instruction) -> str:
     head = " ".join((*insn.prefixes, insn.mnemonic))
     if not insn.operands:
         return head
-    return f"{head} {', '.join(format_operand(op) for op in insn.operands)}"
+    return f"{head} {_operands(insn)}"
 
 
 def format_listing_line(insn: Instruction) -> str:
@@ -64,7 +72,7 @@ def format_listing_line(insn: Instruction) -> str:
     RIP-relative operands get their resolved address as a trailing comment.
     """
     head = " ".join((*insn.prefixes, insn.mnemonic))
-    text = f"{head:<{_MNEMONIC_WIDTH}} {', '.join(format_operand(op) for op in insn.operands)}"
+    text = f"{head:<{_MNEMONIC_WIDTH}} {_operands(insn)}"
     line = _columns(insn.address, insn.raw.hex(" "), text.rstrip())
     targets = [
         target

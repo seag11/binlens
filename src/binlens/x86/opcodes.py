@@ -11,6 +11,7 @@ Operand kinds use the notation of the Intel SDM opcode map (Vol. 2, Appendix A.2
     sIb      an 8-bit immediate sign-extended to the operand size
     Iz       16 bits with a 16-bit operand size, else 32 bits sign-extended to the operand size
     Iv       the full operand size: 16, 32 or 64 bits
+    Jb, Jz   a branch displacement of 8 / 32 bits, relative to the next instruction
 
 Widening the instruction set should mostly mean adding rows here.
 """
@@ -42,7 +43,11 @@ GROUPS: dict[int, dict[int, OpSpec]] = {
     0x8F: {0: OpSpec("pop", ("Ev",), default64=True)},
     0xC6: {0: OpSpec("mov", ("Eb", "Ib"))},
     0xC7: {0: OpSpec("mov", ("Ev", "Iz"))},
-    0xFF: {6: OpSpec("push", ("Ev",), default64=True)},
+    0xFF: {
+        2: OpSpec("call", ("Ev",), default64=True, allow_opsize_override=False),
+        4: OpSpec("jmp", ("Ev",), default64=True, allow_opsize_override=False),
+        6: OpSpec("push", ("Ev",), default64=True),
+    },
 }
 
 ONE_BYTE: dict[int, OpSpec] = {
@@ -56,7 +61,25 @@ ONE_BYTE: dict[int, OpSpec] = {
     # "rep ret" (F3 C3) is a common padding idiom in compiler output.
     0xC2: OpSpec("ret", ("Iw",), allow_rep=True, allow_opsize_override=False),
     0xC3: OpSpec("ret", (), allow_rep=True, allow_opsize_override=False),
+    0xE8: OpSpec("call", ("Jz",), default64=True, allow_opsize_override=False),
+    0xE9: OpSpec("jmp", ("Jz",), default64=True, allow_opsize_override=False),
+    0xEB: OpSpec("jmp", ("Jb",), default64=True, allow_opsize_override=False),
 }
+
+# Opcodes after a 0f escape byte.
+TWO_BYTE: dict[int, OpSpec] = {}
+
+# Condition codes in encoding order, as used by jcc (and later setcc and cmovcc).
+CONDITIONS = ("o", "no", "b", "ae", "e", "ne", "be", "a", "s", "ns", "p", "np", "l", "ge", "le", "g")
+
+for _cc, _condition in enumerate(CONDITIONS):
+    ONE_BYTE[0x70 + _cc] = OpSpec(
+        f"j{_condition}", ("Jb",), default64=True, allow_opsize_override=False
+    )
+    TWO_BYTE[0x80 + _cc] = OpSpec(
+        f"j{_condition}", ("Jz",), default64=True, allow_opsize_override=False
+    )
+del _cc, _condition
 
 # The eight arithmetic/logic operations share one layout. Operation n owns opcodes
 # n*8 + 0..5, and is /n in the immediate groups 80, 81 and 83. (n*8 + 6 and 7 are segment

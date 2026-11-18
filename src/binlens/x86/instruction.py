@@ -56,7 +56,20 @@ class MemoryOperand:
         return self.base is RIP or self.base is EIP
 
 
-Operand = RegisterOperand | ImmediateOperand | MemoryOperand
+@dataclass(frozen=True, slots=True)
+class RelativeOperand:
+    """A direct branch's displacement, counted from the end of the instruction.
+
+    ``Instruction.branch_target`` gives the absolute address.
+    """
+
+    disp: int  # signed
+    size: int  # encoded width in bits: 8 or 32
+
+
+Operand = RegisterOperand | ImmediateOperand | MemoryOperand | RelativeOperand
+
+_ADDRESS_MASK = (1 << 64) - 1
 
 
 @dataclass(frozen=True, slots=True)
@@ -74,6 +87,17 @@ class Instruction:
     @property
     def next_address(self) -> int:
         return self.address + len(self.raw)
+
+    @property
+    def branch_target(self) -> int | None:
+        """Where a direct call or jump goes, or None for every other instruction.
+
+        Indirect branches (``call rax``, ``jmp qword ptr [...]``) have no fixed target.
+        """
+        for operand in self.operands:
+            if isinstance(operand, RelativeOperand):
+                return (self.next_address + operand.disp) & _ADDRESS_MASK
+        return None
 
     def memory_target(self, operand: MemoryOperand) -> int | None:
         """The absolute address a RIP-relative operand refers to, or None for other operands.

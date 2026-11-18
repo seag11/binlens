@@ -13,6 +13,7 @@ from binlens.x86.instruction import (
     MemoryOperand,
     Operand,
     RegisterOperand,
+    RelativeOperand,
 )
 from binlens.x86.intel import format_instruction
 from binlens.x86.registers import Register
@@ -26,6 +27,7 @@ __all__ = [
     "Operand",
     "Register",
     "RegisterOperand",
+    "RelativeOperand",
     "TruncatedInstruction",
     "UnsupportedInstruction",
     "decode",
