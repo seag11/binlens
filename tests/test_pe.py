@@ -18,6 +18,7 @@ def test_parses_headers_and_text_section() -> None:
     assert text.name == ".text"
     assert text.virtual_address == TEXT_RVA
     assert text.executable
+    assert text.permissions == "r-x"
 
 
 def test_section_bytes_drop_file_alignment_padding() -> None:

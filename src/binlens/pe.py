@@ -15,6 +15,8 @@ from dataclasses import dataclass, field
 MACHINE_AMD64 = 0x8664
 _PE32_PLUS_MAGIC = 0x20B
 _SCN_MEM_EXECUTE = 0x2000_0000
+_SCN_MEM_READ = 0x4000_0000
+_SCN_MEM_WRITE = 0x8000_0000
 _SECTION_HEADER_SIZE = 40
 
 
@@ -34,6 +36,14 @@ class Section:
     @property
     def executable(self) -> bool:
         return bool(self.characteristics & _SCN_MEM_EXECUTE)
+
+    @property
+    def permissions(self) -> str:
+        """Memory permissions once loaded, as ``rwx`` with ``-`` for each one missing."""
+        return "".join(
+            letter if self.characteristics & flag else "-"
+            for letter, flag in (("r", _SCN_MEM_READ), ("w", _SCN_MEM_WRITE), ("x", _SCN_MEM_EXECUTE))
+        )
 
 
 @dataclass(frozen=True, slots=True)

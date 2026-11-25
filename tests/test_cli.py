@@ -50,6 +50,10 @@ def test_exe(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     lines = run(capsys, "exe", str(exe))
     assert lines == [
         "; entry point 0x140001000",
+        ";",
+        "; sections (entropy in bits per byte, 0-8)",
+        # Five different byte values: log2(5) = 2.32.
+        ";   .text     0x140001000       0x5 bytes  r-x  entropy 2.32 (too small to judge)",
         "",
         "; section .text  0x140001000  0x5 bytes",
         "0x140001000  48 83 c4 28        add   rsp, 0x28",

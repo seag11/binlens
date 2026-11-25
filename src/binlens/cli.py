@@ -6,7 +6,8 @@ import argparse
 from collections.abc import Iterator, Sequence
 from pathlib import Path
 
-from binlens.pe import PEFormatError, parse_pe
+from binlens.entropy import MIN_RELIABLE_SIZE, shannon_entropy
+from binlens.pe import PEFormatError, PEImage, Section, parse_pe
 from binlens.sweep import BadByte, linear_sweep
 from binlens.x86.intel import format_bad_line, format_listing_line
 
@@ -18,6 +19,18 @@ def listing(code: bytes, address: int = 0) -> Iterator[str]:
             yield format_bad_line(item.address, item.byte, item.error.reason)
         else:
             yield format_listing_line(item)
+
+
+def _section_summary(image: PEImage, section: Section) -> str:
+    data = image.section_bytes(section)
+    if not data:
+        entropy = "no data in file"
+    else:
+        entropy = f"entropy {shannon_entropy(data):.2f}"
+        if len(data) < MIN_RELIABLE_SIZE:
+            entropy += " (too small to judge)"
+    start = image.image_base + section.virtual_address
+    return f"{section.name:<8}  {start:#x}  {len(data):#8x} bytes  {section.permissions}  {entropy}"
 
 
 def _int(text: str) -> int:
@@ -53,6 +66,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         except PEFormatError as err:
             parser.exit(1, f"binlens: {args.path}: {err}\n")
         print(f"; entry point {image.entry_point:#x}")
+        print(";")
+        print("; sections (entropy in bits per byte, 0-8)")
+        for section in image.sections:
+            print(f";   {_section_summary(image, section)}")
         for section in image.sections:
             if not section.executable:
                 continue
